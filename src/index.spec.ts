@@ -7,22 +7,12 @@ const palette: Record<number, Color> = {
   1: [0, 0, 255],
 };
 
-const interpolateColor = (color1: Color, color2: Color, factor = 0.5) => {
-  const result = { ...color1 };
-
-  for (let i = 0; i < color1.length; i++) {
-    result[i] = Math.round(result[i] + factor * (color2[i] - color1[i]));
-  }
-
-  return result;
-};
-
 describe('get color', () => {
   it('gives clearest color at each iteration', () => {
-    // expect(getColorFormProgression(0, palette)).to.eql([0, 0, 0]);
+    expect(getColorFormProgression(0, palette)).to.eql([0, 0, 0]);
     expect(getColorFormProgression(0.25, palette)).to.eql([0, 128, 0]);
-    // expect(getColorFormProgression(0.5, palette)).to.eql([0, 255, 0]);
-    // expect(getColorFormProgression(1, palette)).to.eql([0, 0, 255]);
+    expect(getColorFormProgression(0.5, palette)).to.eql([0, 255, 0]);
+    expect(getColorFormProgression(1, palette)).to.eql([0, 0, 255]);
   });
 });
 
@@ -44,7 +34,7 @@ describe('normalize', () => {
   });
 });
 
-describe.only('toComposant', () => {
+describe('toComponent', () => {
   it('', () => {
     expect(toComponent(0.5)).to.equal(128);
   });
