@@ -6,6 +6,7 @@ class Canvas {
   width = 0;
   height = 0;
   ctx: CanvasRenderingContext2D | null = null;
+  imageData: ImageData | null = null;
 
   constructor() {
     const canvas = document.querySelector('canvas');
@@ -14,16 +15,38 @@ class Canvas {
       this.width = canvas.width;
       this.height = canvas.height;
       this.ctx = canvas.getContext('2d');
+
+      if (this.ctx) {
+        this.imageData = this.ctx.createImageData(this.width, this.height);
+      }
     }
   }
 
-  draw({ x, y }: Pixel, color: Color) {
-    this.ctx!.fillStyle = this.getColorFromComponents(color);
-    this.ctx!.fillRect(x, y, 1, 1);
-  }
+  drawMandelbrotSet(set: (number | null)[]) {
+    if (!this.imageData) {
+      console.log('ooops no image data was created');
+      return;
+    }
 
-  private getColorFromComponents([r, g, b]: Color) {
-    return `rgb(${r}, ${g}, ${b})`;
+    const data = this.imageData.data;
+
+    for (let i = 0; i < set.length; i++) {
+      let color: Color = [0, 0, 0];
+      const progression = set[i];
+
+      if (progression) {
+        color = getColorFormProgression(progression);
+      }
+
+      const idx = i * 4;
+
+      data[idx] = color[0];
+      data[idx + 1] = color[1];
+      data[idx + 2] = color[2];
+      data[idx + 3] = 255;
+    }
+
+    this.ctx?.putImageData(this.imageData, 0, 0);
   }
 
   centerX(x: number) {
@@ -112,11 +135,13 @@ export const getColorFormProgression = (progression: number, palette = defaultPa
 };
 
 const mandelbrot = (maxIter = 10) => {
-  for (let x = 0; x < canvas.width; x++) {
-    for (let y = 0; y < canvas.height; y++) {
-      const c = plan.pixelToPoint({ x: canvas.centerX(x), y: canvas.centerY(y) });
+  const result: (number | null)[] = [];
 
-      let color: Color = [0, 0, 0];
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      let progression = null;
+
+      const c = plan.pixelToPoint({ x: canvas.centerX(x), y: canvas.centerY(y) });
 
       let zr = 0;
       let zi = 0;
@@ -135,14 +160,16 @@ const mandelbrot = (maxIter = 10) => {
         zi2 = zi * zi;
 
         if (zr2 + zi2 >= 4) {
-          color = getColorFormProgression(iter / maxIter);
+          progression = iter / maxIter;
           break;
         }
       }
 
-      canvas.draw({ x, y }, color);
+      result.push(progression);
     }
   }
+
+  return result;
 };
 
 let maxIter = 50;
@@ -161,10 +188,14 @@ const main = () => {
   window.addEventListener('keydown', (event: KeyboardEvent) => {
     actions[event.key]?.();
 
-    mandelbrot(maxIter);
+    const mandelbrotSet = mandelbrot(maxIter);
+
+    canvas.drawMandelbrotSet(mandelbrotSet);
   });
 
-  mandelbrot(maxIter);
+  const mandelbrotSet = mandelbrot(maxIter);
+
+  canvas.drawMandelbrotSet(mandelbrotSet);
 };
 
 main();
