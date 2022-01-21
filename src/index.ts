@@ -1,80 +1,15 @@
-type Pixel = { x: number; y: number };
-type Point = { re: number; im: number };
+export type Pixel = { x: number; y: number };
+export type Point = { re: number; im: number };
 export type Color = [number, number, number];
 
-class Canvas {
-  width = 0;
-  height = 0;
-  ctx: CanvasRenderingContext2D | null = null;
-  imageData: ImageData | null = null;
-
-  constructor() {
-    const canvas = document.querySelector('canvas');
-
-    if (canvas) {
-      this.width = canvas.width;
-      this.height = canvas.height;
-      this.ctx = canvas.getContext('2d');
-
-      if (this.ctx) {
-        this.imageData = this.ctx.createImageData(this.width, this.height);
-      }
-    }
-  }
-
-  drawMandelbrotSet(set: (number | null)[]) {
-    if (!this.imageData) {
-      console.log('ooops no image data was created');
-      return;
-    }
-
-    const data = this.imageData.data;
-
-    for (let i = 0; i < set.length; i++) {
-      let color: Color = [0, 0, 0];
-      const progression = set[i];
-
-      if (progression) {
-        color = getColorFormProgression(progression);
-      }
-
-      const idx = i * 4;
-
-      data[idx] = color[0];
-      data[idx + 1] = color[1];
-      data[idx + 2] = color[2];
-      data[idx + 3] = 255;
-    }
-
-    this.ctx?.putImageData(this.imageData, 0, 0);
-  }
-
-  centerX(x: number) {
-    return x - this.width / 2;
-  }
-
-  centerY(y: number) {
-    return y - this.height / 2;
-  }
-}
-
-class Plan {
-  x = 0.6;
-  y = 0;
-
-  zoom = 175;
-
-  pixelToPoint({ x, y }: Pixel): Point {
-    // prettier-ignore
-    return {
-      re: x / this.zoom - this.x,
-      im: y / this.zoom - this.y,
-    };
-  }
-}
-
-const canvas = new Canvas();
-const plan = new Plan();
+export type MandelbrotParams = {
+  maxIter: number;
+  width: number;
+  height: number;
+  zoom: number;
+  startX: number;
+  startY: number;
+};
 
 const getRandomColor = (): Color => {
   const r = Math.round(Math.random() * 255);
@@ -134,68 +69,122 @@ export const getColorFormProgression = (progression: number, palette = defaultPa
   return interpolateColor(startColor, endColor, value);
 };
 
-const mandelbrot = (maxIter = 10) => {
-  const result: (number | null)[] = [];
+const drawMandelbrotSet = (
+  set: (number | null)[],
+  imageData: ImageData,
+  ctx: CanvasRenderingContext2D
+) => {
+  const data = imageData.data;
 
-  for (let y = 0; y < canvas.height; y++) {
-    for (let x = 0; x < canvas.width; x++) {
-      let progression = null;
+  for (let i = 0; i < set.length; i++) {
+    let color: Color = [0, 0, 0];
+    const progression = set[i];
 
-      const c = plan.pixelToPoint({ x: canvas.centerX(x), y: canvas.centerY(y) });
-
-      let zr = 0;
-      let zi = 0;
-
-      let zr2 = zr + zr;
-      let zi2 = zi + zi;
-
-      let iter;
-      for (iter = 1; iter <= maxIter; iter++) {
-        const re = zr;
-
-        zr = zr2 - zi2 + c.re;
-        zi = 2 * re * zi + c.im;
-
-        zr2 = zr * zr;
-        zi2 = zi * zi;
-
-        if (zr2 + zi2 >= 4) {
-          progression = iter / maxIter;
-          break;
-        }
-      }
-
-      result.push(progression);
+    if (progression) {
+      color = getColorFormProgression(progression);
     }
+
+    const idx = i * 4;
+
+    data[idx] = color[0];
+    data[idx + 1] = color[1];
+    data[idx + 2] = color[2];
+    data[idx + 3] = 255;
   }
 
-  return result;
+  ctx.putImageData(imageData, 0, 0);
 };
 
-let maxIter = 50;
+if (window.Worker) {
+  const canvas = document.querySelector('canvas');
 
-const actions: { [key: KeyboardEvent['key']]: (() => void) | undefined } = {
-  ArrowRight: () => (plan.x -= 30 / plan.zoom),
-  ArrowLeft: () => (plan.x += 30 / plan.zoom),
-  ArrowUp: () => (plan.y += 30 / plan.zoom),
-  ArrowDown: () => (plan.y -= 30 / plan.zoom),
-  ' ': () => (plan.zoom *= 1.5),
-  Alt: () => (plan.zoom /= 1.5),
-  Control: () => (maxIter += 25),
-};
+  if (canvas) {
+    const width = canvas.width;
+    const height = canvas.height;
+    const ctx = canvas.getContext('2d');
 
-const main = () => {
-  window.addEventListener('keydown', (event: KeyboardEvent) => {
-    actions[event.key]?.();
+    let imageData: ImageData;
 
-    const mandelbrotSet = mandelbrot(maxIter);
+    if (ctx) {
+      imageData = ctx.createImageData(width, height);
 
-    canvas.drawMandelbrotSet(mandelbrotSet);
-  });
+      let maxIter = 50;
+      let zoom = 175;
+      let startX = 0.6;
+      let startY = 0;
 
-  const mandelbrotSet = mandelbrot(maxIter);
+      let params = {
+        width,
+        height,
+        maxIter,
+        zoom,
+        startX,
+        startY,
+      };
 
-  canvas.drawMandelbrotSet(mandelbrotSet);
-};
+      const actions: { [key: KeyboardEvent['key']]: () => MandelbrotParams } = {
+        ArrowRight: () => {
+          params.startX = params.startX - 30 / params.zoom;
+          return params;
+        },
+        ArrowLeft: () => {
+          params.startX = params.startX + 30 / params.zoom;
+          return params;
+        },
+        ArrowUp: () => {
+          params.startY = params.startY + 30 / params.zoom;
+          return params;
+        },
+        ArrowDown: () => {
+          params.startY = params.startY - 30 / params.zoom;
+          return params;
+        },
+        ' ': () => {
+          params.zoom = params.zoom * 1.5;
+          return params;
+        },
+        Alt: () => {
+          params.zoom = params.zoom / 1.5;
+          return params;
+        },
+        Control: () => {
+          params.maxIter = params.maxIter + 25;
+          return params;
+        },
+      };
 
-main();
+      let worker = new Worker('worker.js');
+
+      window.addEventListener('keydown', (event: KeyboardEvent) => {
+        const action = actions[event.key];
+
+        if (action) {
+          if (worker) {
+            worker.terminate();
+          }
+
+          params = action();
+
+          worker = new Worker('worker.js');
+          worker.postMessage(params);
+
+          worker.onmessage = function (e) {
+            const result = e.data;
+
+            drawMandelbrotSet(result, imageData, ctx);
+          };
+        }
+      });
+
+      worker.postMessage(params);
+
+      worker.onmessage = function (e) {
+        const result = e.data;
+
+        drawMandelbrotSet(result, imageData, ctx);
+      };
+    }
+  }
+} else {
+  console.log("Your browser doesn't support web workers.");
+}
