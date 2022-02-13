@@ -24,7 +24,6 @@ const config = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].js',
-    globalObject: 'this',
   },
   plugins: [new HtmlWebpackPlugin({ chunks: ['index'], template: 'src/index.html' })],
 
